@@ -334,12 +334,16 @@ class LLMHandler:
         """
         try:
             if device == "auto":
-                if torch.cuda.is_available():
+                if is_cuda_compatible():
                     device = "cuda"
                 elif hasattr(torch, 'xpu') and torch.xpu.is_available():
                     device = "xpu"
                 else:
                     device = "cpu"
+            elif device == "cuda" and not is_cuda_compatible():
+                # User requested CUDA but GPU is not compatible, fall back to CPU
+                logger.warning("CUDA requested but GPU is not compatible, falling back to CPU")
+                device = "cpu"
 
             self.device = device
             self.offload_to_cpu = offload_to_cpu
