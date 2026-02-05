@@ -43,7 +43,7 @@ from acestep.constants import (
     DEFAULT_DIT_INSTRUCTION,
 )
 from acestep.dit_alignment_score import MusicStampsAligner, MusicLyricScorer
-from acestep.gpu_config import get_gpu_memory_gb, is_cuda_compatible
+from acestep.gpu_config import get_gpu_memory_gb, is_cuda_compatible, configure_cpu_threads
 
 
 warnings.filterwarnings("ignore")
@@ -53,6 +53,9 @@ class AceStepHandler:
     """ACE-Step Business Logic Handler"""
     
     def __init__(self):
+        # Configure CPU threads early for optimal parallelism
+        configure_cpu_threads()
+        
         self.model = None
         self.config = None
         self.device = "cpu"
