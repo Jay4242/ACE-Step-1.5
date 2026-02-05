@@ -352,6 +352,11 @@ class AceStepHandler:
             self.offload_dit_to_cpu = offload_dit_to_cpu
             # Set dtype based on device: bfloat16 for cuda, float32 for cpu
             self.dtype = torch.bfloat16 if device in ["cuda","xpu"] else torch.float32
+            
+            # Force disable flash attention on CPU - it only works on CUDA
+            if device == "cpu" and use_flash_attention:
+                logger.warning("[initialize_service] Flash attention requested but running on CPU - disabling flash attention")
+                use_flash_attention = False
             self.quantization = quantization
             if self.quantization is not None:
                 assert compile_model, "Quantization requires compile_model to be True"
