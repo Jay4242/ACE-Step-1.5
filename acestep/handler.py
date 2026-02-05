@@ -43,7 +43,7 @@ from acestep.constants import (
     DEFAULT_DIT_INSTRUCTION,
 )
 from acestep.dit_alignment_score import MusicStampsAligner, MusicLyricScorer
-from acestep.gpu_config import get_gpu_memory_gb
+from acestep.gpu_config import get_gpu_memory_gb, is_cuda_compatible
 
 
 warnings.filterwarnings("ignore")
@@ -337,7 +337,8 @@ class AceStepHandler:
             if device == "auto":
                 if hasattr(torch, 'xpu') and torch.xpu.is_available():
                     device = "xpu"
-                elif torch.cuda.is_available():
+                elif is_cuda_compatible():
+                    # Use CUDA only if GPU is actually compatible with PyTorch
                     device = "cuda"
                 elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
                     device = "mps"
