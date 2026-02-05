@@ -110,9 +110,52 @@ GPU_TIER_CONFIGS = {
 }
 
 
+def is_cuda_compatible() -> bool:
+    """
+    Check if CUDA is not only available but also compatible with the current GPU.
+    
+    PyTorch may report CUDA as "available" even when the GPU's compute capability
+    is not supported by the installed PyTorch version. This function performs
+    a simple tensor operation to verify actual compatibility.
+    
+    Returns:
+        True if CUDA is available and the GPU is compatible, False otherwise.
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return False
+        
+        # Check compute capability
+        props = torch.cuda.get_device_properties(0)
+        major, minor = props.major, props.minor
+        
+        # PyTorch 2.x typically requires compute capability >= 7.0
+        # (sm_70 for Volta, sm_75 for Turing, sm_80 for Ampere, etc.)
+        if major < 7:
+            logger.warning(
+                f"GPU {props.name} has compute capability {major}.{minor}, "
+                f"but PyTorch requires >= 7.0. Falling back to CPU."
+            )
+            return False
+        
+        # Try a simple tensor operation to verify CUDA actually works
+        try:
+            test_tensor = torch.zeros(1, device='cuda')
+            del test_tensor
+            return True
+        except Exception as e:
+            logger.warning(f"CUDA test operation failed: {e}. Falling back to CPU.")
+            return False
+            
+    except Exception as e:
+        logger.warning(f"CUDA compatibility check failed: {e}")
+        return False
+
+
 def get_gpu_memory_gb() -> float:
     """
-    Get GPU memory in GB. Returns 0 if no GPU is available.
+    Get GPU memory in GB. Returns 0 if no GPU is available or compatible.
     
     Debug Mode:
         Set environment variable MAX_CUDA_VRAM to override the detected GPU memory.
@@ -132,7 +175,8 @@ def get_gpu_memory_gb() -> float:
     
     try:
         import torch
-        if torch.cuda.is_available():
+        # Check CUDA compatibility (not just availability)
+        if is_cuda_compatible():
             # Get total memory of the first GPU in GB
             total_memory = torch.cuda.get_device_properties(0).total_memory
             memory_gb = total_memory / (1024**3)  # Convert bytes to GB
