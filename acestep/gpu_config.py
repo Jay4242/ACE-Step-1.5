@@ -15,9 +15,51 @@ from dataclasses import dataclass
 from typing import Optional, List, Dict, Tuple
 from loguru import logger
 
+import torch
+
 
 # Environment variable for debugging/testing different GPU memory configurations
 DEBUG_MAX_CUDA_VRAM_ENV = "MAX_CUDA_VRAM"
+
+
+def configure_cpu_threads() -> int:
+    """
+    Configure CPU thread usage for PyTorch and other libraries.
+    
+    Uses all available CPU threads minus 2, unless there are 2 or fewer threads,
+    in which case uses 100% of available threads.
+    
+    This affects:
+    - PyTorch intra-op parallelism (torch.set_num_threads)
+    - PyTorch inter-op parallelism (torch.set_num_interop_threads)
+    - OpenMP threads (OMP_NUM_THREADS)
+    - MKL threads (MKL_NUM_THREADS)
+    
+    Returns:
+        The number of threads configured
+    """
+    cpu_count = os.cpu_count() or 1
+    
+    if cpu_count <= 2:
+        num_threads = cpu_count
+    else:
+        num_threads = cpu_count - 2
+    
+    # Set PyTorch thread settings
+    torch.set_num_threads(num_threads)
+    torch.set_num_interop_threads(num_threads)
+    
+    # Set environment variables for other libraries (OpenMP, MKL, etc.)
+    # These need to be set before the libraries are loaded, but setting them
+    # here ensures they're available for any subsequent imports
+    os.environ["OMP_NUM_THREADS"] = str(num_threads)
+    os.environ["MKL_NUM_THREADS"] = str(num_threads)
+    os.environ["NUMEXPR_NUM_THREADS"] = str(num_threads)
+    os.environ["OPENBLAS_NUM_THREADS"] = str(num_threads)
+    
+    logger.info(f"CPU thread configuration: using {num_threads} threads (out of {cpu_count} available)")
+    
+    return num_threads
 
 
 @dataclass
