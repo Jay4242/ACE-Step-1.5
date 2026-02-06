@@ -21,6 +21,9 @@ import torch
 # Environment variable for debugging/testing different GPU memory configurations
 DEBUG_MAX_CUDA_VRAM_ENV = "MAX_CUDA_VRAM"
 
+# Track whether CPU threads have been configured (can only be done once)
+_cpu_threads_configured = False
+
 
 def configure_cpu_threads() -> int:
     """
@@ -35,9 +38,14 @@ def configure_cpu_threads() -> int:
     - OpenMP threads (OMP_NUM_THREADS)
     - MKL threads (MKL_NUM_THREADS)
     
+    Note: This function can only configure threads once. Subsequent calls will
+    return the previously configured thread count without making changes.
+    
     Returns:
         The number of threads configured
     """
+    global _cpu_threads_configured
+    
     cpu_count = os.cpu_count() or 1
     
     if cpu_count <= 2:
@@ -45,19 +53,25 @@ def configure_cpu_threads() -> int:
     else:
         num_threads = cpu_count - 2
     
-    # Set PyTorch thread settings
-    torch.set_num_threads(num_threads)
-    torch.set_num_interop_threads(num_threads)
+    # Only configure threads once - PyTorch doesn't allow changing interop threads
+    # after parallel work has started
+    if not _cpu_threads_configured:
+        try:
+            # Set PyTorch thread settings
+            torch.set_num_threads(num_threads)
+            torch.set_num_interop_threads(num_threads)
+            _cpu_threads_configured = True
+            logger.info(f"CPU thread configuration: using {num_threads} threads (out of {cpu_count} available)")
+        except RuntimeError as e:
+            # If threads were already configured by something else, just log and continue
+            logger.debug(f"CPU threads already configured: {e}")
+            _cpu_threads_configured = True
     
-    # Set environment variables for other libraries (OpenMP, MKL, etc.)
-    # These need to be set before the libraries are loaded, but setting them
-    # here ensures they're available for any subsequent imports
+    # Always set environment variables (these can be set multiple times safely)
     os.environ["OMP_NUM_THREADS"] = str(num_threads)
     os.environ["MKL_NUM_THREADS"] = str(num_threads)
     os.environ["NUMEXPR_NUM_THREADS"] = str(num_threads)
     os.environ["OPENBLAS_NUM_THREADS"] = str(num_threads)
-    
-    logger.info(f"CPU thread configuration: using {num_threads} threads (out of {cpu_count} available)")
     
     return num_threads
 
