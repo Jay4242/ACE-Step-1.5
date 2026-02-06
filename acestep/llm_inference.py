@@ -21,8 +21,7 @@ from transformers.generation.logits_process import (
 )
 from acestep.constrained_logits_processor import MetadataConstrainedLogitsProcessor
 from acestep.constants import DEFAULT_LM_INSTRUCTION, DEFAULT_LM_UNDERSTAND_INSTRUCTION, DEFAULT_LM_INSPIRED_INSTRUCTION, DEFAULT_LM_REWRITE_INSTRUCTION
-from acestep.gpu_config import is_cuda_compatible, get_lm_gpu_memory_ratio, get_gpu_memory_gb, get_lm_model_size, get_global_gpu_config
-from acestep.gpu_config import get_lm_gpu_memory_ratio, get_gpu_memory_gb, get_lm_model_size, get_global_gpu_config
+from acestep.gpu_config import is_cuda_compatible, get_lm_gpu_memory_ratio, get_gpu_memory_gb, get_lm_model_size, get_global_gpu_config, configure_cpu_threads
 
 
 class LLMHandler:
@@ -35,6 +34,9 @@ class LLMHandler:
 
     def __init__(self, persistent_storage_path: Optional[str] = None):
         """Initialize LLMHandler with default values"""
+        # Configure CPU threads early for optimal parallelism
+        configure_cpu_threads()
+        
         self.llm = None
         self.llm_tokenizer = None
         self.llm_initialized = False
@@ -2042,6 +2044,9 @@ class LLMHandler:
         Custom generation loop with constrained decoding support (non-CFG).
         This allows us to call update_state() after each token generation.
         """
+        # Ensure CPU thread settings are applied for this generation
+        configure_cpu_threads()
+        
         model = self.llm
         device = self.device
         
@@ -2142,6 +2147,9 @@ class LLMHandler:
         
         Batch format: [cond_input, uncond_input]
         """
+        # Ensure CPU thread settings are applied for this generation
+        configure_cpu_threads()
+        
         model = self.llm
         device = self.device
         batch_size = batch_input_ids.shape[0] // 2  # Half are conditional, half are unconditional
